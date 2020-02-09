@@ -1,0 +1,14 @@
+
+.DS_Store
+
+checker.egg-info/
+
+checker/__pycache__/
+
+build/
+
+*.png
+
+*.txt
+
+dist/
