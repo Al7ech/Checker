@@ -12,6 +12,6 @@ setup(name=__name__,
       description='Backtesting tool for Automated Trading Systems',
       packages=find_packages(exclude=['examples']),
       long_description=open('README.md').read(),
-      setup_requires=['numpy>=1.15','pandas'],
-      install_requires=['numpy>=1.15','pandas']
+      setup_requires=['numpy>=1.15','pandas','matplotlib'],
+      install_requires=['numpy>=1.15','pandas','matplotlib']
 )
