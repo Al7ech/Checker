@@ -19,6 +19,6 @@ s.short_exit = lambda x : x["sma"] > x["high"]
 s.long_entry_price = s.long_exit_price = s.short_entry_price = s.short_exit_price = lambda x : x["C"]
 
 bt = Backtest()
-bt.strategy = s
-bt.candles = c
+bt.bind_strategy(s)
+bt.bind_candles(c)
 bt.run()
