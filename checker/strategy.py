@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 class Strategy:
     def __init__(self, name : str, *,
@@ -15,6 +16,7 @@ class Strategy:
         self.long_exit_price = None
         self.short_entry_price = None
         self.short_exit_price = None
+        self.leverage = lambda x : np.ones(len(x))
 
 
     def runable(self):

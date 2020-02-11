@@ -21,4 +21,5 @@ s.long_entry_price = s.long_exit_price = s.short_entry_price = s.short_exit_pric
 bt = Backtest()
 bt.bind_strategy(s)
 bt.bind_candles(c)
+bt.set_fee(entry_fee=0.001, exit_fee=0.001)
 bt.run()
