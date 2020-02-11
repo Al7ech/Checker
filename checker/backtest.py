@@ -12,7 +12,7 @@ warnings.filterwarnings("ignore")
 # TODO:
 # 점화식 백테스팅
 # 동적 leverage 설정
-# 결과지표들 뽑기
+# Stop loss
 
 class Backtest:
     def __init__(self):
@@ -73,6 +73,12 @@ class Backtest:
         balance_pos = 0
         leverage = self._strategy.leverage(self._candles)
         entry_leverage = 1
+        trades = 0
+        win_trades = 0
+        long_pl = pd.Series(np.zeros(N))  # profit/loss of buy position
+        short_pl = pd.Series(np.zeros(N))  # profit/loss of sell position
+        long_rr = []
+        short_rr = []
 
         fee_const = (1 - self._entry_fee) * (1 - self._exit_fee)
         
@@ -81,19 +87,25 @@ class Backtest:
         balance_history[0] = balance
         self._trade_history = []
         for i in range(1,N):
-            if do_long_trade and long_exit[i]:
+            if do_long_trade and (long_exit[i] or i == N-1):
                 if buy_price > 0:
                     sell_price = long_exit_price[i]
                     balance = balance_pos + entry_leverage * (balance_pos * (sell_price * fee_const / buy_price) - balance_pos)
+                    long_pl[i] = balance - balance_pos
+                    long_rr.append(balance/balance_pos)
+                    trades += 1
                     balance_pos = 0
                     buy_price = 0
                     self._trade_history.append(str(self._candles.index[i]) + " : long exit with price =  \t" + str(sell_price))
                     self._trade_history.append(str(self._candles.index[i]) + " : current balance = " + str(balance + balance_pos))
-            if do_short_trade:
-                if buy_price < 0 and short_exit[i]:
+            if do_short_trade and (short_exit[i] or i == N-1):
+                if buy_price < 0:
                     buy_price = -buy_price
                     sell_price = short_exit_price[i]
                     balance = balance_pos + entry_leverage * (balance_pos * ((2*buy_price - sell_price) * fee_const / buy_price) - balance_pos)
+                    short_pl[i] = balance - balance_pos
+                    short_rr.append(balance/balance_pos)
+                    trades += 1
                     balance_pos = 0
                     buy_price = 0
                     self._trade_history.append(str(self._candles.index[i]) + " : short exit with price = \t" + str(sell_price))
@@ -116,6 +128,37 @@ class Backtest:
             balance_history[i] = balance + balance_pos
 
         self._candles["balance"] = balance_history
+        self._candles["drawdown"] = 1 - self._candles["balance"] / self._candles["balance"].cummax()
+
+        win_trades = np.count_nonzero(long_pl.clip(lower=0)) + np.count_nonzero(
+            short_pl.clip(lower=0)
+        )
+        lose_trades = np.count_nonzero(long_pl.clip(upper=0)) + np.count_nonzero(
+            short_pl.clip(upper=0)
+        )
+        gross_profit = long_pl.clip(lower=0).sum() + short_pl.clip(lower=0).sum()
+        gross_loss = long_pl.clip(upper=0).sum() + short_pl.clip(upper=0).sum()
+        profit_pl = gross_profit + gross_loss
+        mdd = self._candles["drawdown"].max()
+        return_rate = pd.Series(short_rr + long_rr)
+
+
+        s = pd.Series()
+        s.loc["total profit"] = round(balance_history[-1], 5)
+        s.loc["total trades"] = trades
+        s.loc["win rate"] = str(round(win_trades / trades * 100, 3)) + "%"
+        s.loc["profit factor"] = round(-gross_profit / gross_loss, 3)
+        s.loc["maximum drawdown"] = str(round(mdd*100, 2)) + "%"
+        s.loc["recovery factor"] = round(profit_pl / mdd, 3)
+        s.loc["riskreward ratio"] = round(
+            -(gross_profit / win_trades) / (gross_loss / lose_trades), 3
+        )
+        s.loc["sharpe ratio"] = round(
+            return_rate.mean() / return_rate.std(), 3
+        )
+        s.loc["average return"] = round(return_rate.mean(), 3)
+        # s.loc["stop loss"] = stop_loss
+        self.indices = s
     
     def plot(self, filename = ""):
         if filename == "":
@@ -138,7 +181,7 @@ class Backtest:
         axes[0].set(xlabel="Time", ylabel="Equity Ratio")
         axes[0].xaxis.set_major_locator(mdates.MonthLocator(interval=1))    # xtick interval
         axes[0].tick_params(labelrotation=45)                               # xtick rotation
-        axes[0].text(1.01,0.25, "final balance : " + str(round(self._candles["balance"].iloc[-1],3)), size=20, transform=axes[0].transAxes)
+        axes[0].text(1.01,0.25, repr(self.indices), size=20, transform=axes[0].transAxes)
         axes[0].title.set_text('Equity Ratio')                              # Set title
         for tick in axes[0].xaxis.get_major_ticks():
                 tick.label.set_fontsize(15)
